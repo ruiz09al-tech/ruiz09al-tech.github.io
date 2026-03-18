@@ -879,11 +879,15 @@ document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
 // PAGES
 const PAGES=['home','projects','about','services','contact'];
 const LIGHT=['about','services','contact'];
-let cur_page='home', animating=false;
+let cur_page='home';
+let lastNav=0;
+const NAV_COOLDOWN=1000;
 
 function goTo(id){
-  if(id===cur_page||animating) return;
-  animating=true;
+  if(id===cur_page) return;
+  const now=Date.now();
+  if(now-lastNav < NAV_COOLDOWN) return;
+  lastNav=now;
   document.getElementById('page-'+cur_page).classList.remove('active');
   document.getElementById('page-'+id).classList.add('active');
   document.querySelectorAll('.nav-links a').forEach(a=>a.classList.toggle('active',a.dataset.page===id));
@@ -891,28 +895,40 @@ function goTo(id){
   document.querySelectorAll('.page-dot').forEach(d=>d.classList.toggle('active',d.dataset.page===id));
   pnav.classList.toggle('light',LIGHT.includes(id));
   cur_page=id;
-  setTimeout(()=>animating=false,950);
 }
+
+function navNext(){const idx=PAGES.indexOf(cur_page);if(idx<PAGES.length-1)goTo(PAGES[idx+1]);}
+function navPrev(){const idx=PAGES.indexOf(cur_page);if(idx>0)goTo(PAGES[idx-1]);}
 
 document.querySelectorAll('[data-page]').forEach(el=>
   el.addEventListener('click',e=>{e.preventDefault();goTo(el.dataset.page);})
 );
 
-let wacc=0;
+// Scroll — funciona con mouse y trackpad
+let wheelAcc=0, wheelTimer=null;
 window.addEventListener('wheel',e=>{
-  wacc+=e.deltaY;
-  if(Math.abs(wacc)<65) return;
-  const dir=wacc>0?1:-1; wacc=0;
-  const idx=PAGES.indexOf(cur_page);
-  const next=PAGES[idx+dir];
-  if(next) goTo(next);
-},{passive:true});
+  e.preventDefault();
+  wheelAcc+=e.deltaY;
+  clearTimeout(wheelTimer);
+  wheelTimer=setTimeout(()=>{
+    if(Math.abs(wheelAcc)>30){if(wheelAcc>0)navNext();else navPrev();}
+    wheelAcc=0;
+  },80);
+},{passive:false});
 
+// Teclado
 document.addEventListener('keydown',e=>{
-  const idx=PAGES.indexOf(cur_page);
-  if(['ArrowDown','ArrowRight','PageDown'].includes(e.key)){const n=PAGES[idx+1];if(n)goTo(n);}
-  if(['ArrowUp','ArrowLeft','PageUp'].includes(e.key)){const n=PAGES[idx-1];if(n)goTo(n);}
+  if(e.key==='ArrowDown'||e.key==='ArrowRight'||e.key==='PageDown') navNext();
+  if(e.key==='ArrowUp'||e.key==='ArrowLeft'||e.key==='PageUp') navPrev();
 });
+
+// Touch / swipe móvil
+let touchY=0;
+window.addEventListener('touchstart',e=>{touchY=e.touches[0].clientY;},{passive:true});
+window.addEventListener('touchend',e=>{
+  const diff=touchY-e.changedTouches[0].clientY;
+  if(Math.abs(diff)>50){if(diff>0)navNext();else navPrev();}
+},{passive:true});
 
 // SLIDESHOW
 let cs=0; const ts=7; let st;
